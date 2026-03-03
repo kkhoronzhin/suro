@@ -1,0 +1,358 @@
+{% extends "base.html" %}
+
+{% block title %}SURO Admin - Пользователи{% endblock %}
+
+{% block content %}
+<div class="header">
+    <h1>Пользователи</h1>
+    <div class="header-actions">
+        <a href="/admin/users/export" class="btn btn-primary">
+            <i class="fas fa-download"></i>
+            Экспорт
+        </a>
+    </div>
+</div>
+
+<!-- Статистика -->
+<div class="stats">
+    <div class="stat-card">
+        <div class="stat-title">Всего пользователей</div>
+        <div class="stat-value" id="totalUsers">—</div>
+        <div class="stat-change">за всё время</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Администраторов</div>
+        <div class="stat-value" id="totalAdmins">—</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Новых сегодня</div>
+        <div class="stat-value" id="todayUsers">—</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Активных (30д)</div>
+        <div class="stat-value" id="activeUsers">—</div>
+    </div>
+</div>
+
+<!-- Поиск -->
+<div class="search-bar">
+    <input type="text" class="search-input" id="searchInput" 
+           placeholder="Поиск по ID, username или имени...">
+    <select class="form-select" id="roleFilter" style="width: 150px;">
+        <option value="all">Все роли</option>
+        <option value="admin">Администраторы</option>
+        <option value="user">Пользователи</option>
+    </select>
+    <button class="btn btn-primary" onclick="searchUsers()">
+        <i class="fas fa-search"></i>
+        Найти
+    </button>
+</div>
+
+<!-- Таблица пользователей -->
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Пользователь</th>
+                <th>Telegram</th>
+                <th>Роль</th>
+                <th>Регистрация</th>
+                <th>Активность</th>
+                <th>Заявок</th>
+                <th>Выплачено</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody id="usersList">
+            <!-- Загружается через API -->
+        </tbody>
+    </table>
+    <div class="loading" id="loading" style="display: none;">
+        <i class="fas fa-spinner"></i>
+        Загрузка...
+    </div>
+</div>
+
+<!-- Пагинация -->
+<div class="pagination" id="pagination"></div>
+
+<!-- Модалка действий -->
+<div class="modal" id="actionModal">
+    <div class="modal-content" style="max-width: 400px;">
+        <div class="modal-header">
+            <h3 class="modal-title" id="actionModalTitle">Действие</h3>
+            <button class="modal-close" onclick="Modal.hide('actionModal')">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body" id="actionModalBody">
+            <!-- Содержимое -->
+        </div>
+        <div class="modal-actions">
+            <button class="btn" onclick="Modal.hide('actionModal')">Отмена</button>
+            <button class="btn btn-primary" id="actionModalConfirm">Подтвердить</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentPage = 1;
+let currentSearch = '';
+let currentRole = 'all';
+let selectedUserId = null;
+
+// Загрузка статистики
+async function loadStats() {
+    try {
+        const data = await API.get('/stats');
+        document.getElementById('totalUsers').textContent = data.data.total.users;
+        document.getElementById('totalAdmins').textContent = data.data.total.admins;
+        document.getElementById('todayUsers').textContent = data.data.today.users;
+        document.getElementById('activeUsers').textContent = data.data.active_users || '—';
+    } catch (error) {
+        console.error('Error loading stats:', error);
+    }
+}
+
+// Загрузка пользователей
+async function loadUsers() {
+    const loading = document.getElementById('loading');
+    const tbody = document.getElementById('usersList');
+    
+    loading.style.display = 'flex';
+    
+    try {
+        const data = await API.get('/users', {
+            page: currentPage,
+            per_page: 20,
+            search: currentSearch,
+            role: currentRole !== 'all' ? currentRole : null
+        });
+        
+        renderUsers(data.data.users);
+        renderPagination(data.data.pagination);
+    } catch (error) {
+        console.error('Error:', error);
+    } finally {
+        loading.style.display = 'none';
+    }
+}
+
+function renderUsers(users) {
+    const tbody = document.getElementById('usersList');
+    
+    if (!users || users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 2rem;">Пользователи не найдены</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = users.map(user => {
+        const initial = (user.first_name || '?')[0].toUpperCase();
+        const color = stringToColor(user.user_id.toString());
+        
+        return `
+        <tr>
+            <td>${user.id}</td>
+            <td>
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <div style="width: 40px; height: 40px; background: ${color}; 
+                                border-radius: 50%; display: flex; align-items: center; 
+                                justify-content: center; color: white; font-weight: 600;">
+                        ${initial}
+                    </div>
+                    <div>
+                        <div><strong>${user.first_name || ''} ${user.last_name || ''}</strong></div>
+                        <div style="font-size: 0.75rem; color: #94a3b8;">ID: ${user.user_id}</div>
+                    </div>
+                </div>
+            </td>
+            <td>
+                ${user.username ? 
+                    `<a href="https://t.me/${user.username}" target="_blank" style="color: #3b82f6;">
+                        @${user.username}
+                     </a>` : 
+                    '—'}
+            </td>
+            <td>
+                ${user.is_admin ? 
+                    '<span class="badge badge-primary"><i class="fas fa-crown"></i> Админ</span>' : 
+                    '<span class="badge badge-muted">Пользователь</span>'}
+            </td>
+            <td>${DateFormatter.format(user.created_at, 'short')}</td>
+            <td>
+                <span title="${DateFormatter.format(user.last_activity, 'long')}">
+                    ${DateFormatter.relative(user.last_activity)}
+                </span>
+            </td>
+            <td>${user.applications_count || 0}</td>
+            <td>${(user.total_paid || 0).toLocaleString()}₽</td>
+            <td>
+                <div class="actions">
+                    <button class="action-btn" onclick="viewUser(${user.user_id})" title="Просмотр">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="action-btn" onclick="sendMessage(${user.user_id}, '${user.username || ''}')" 
+                            title="Написать">
+                        <i class="fas fa-envelope"></i>
+                    </button>
+                    ${user.is_admin ? 
+                        `<button class="action-btn" onclick="removeAdmin(${user.user_id})" title="Убрать админа">
+                            <i class="fas fa-user-minus"></i>
+                         </button>` : 
+                        `<button class="action-btn" onclick="makeAdmin(${user.user_id})" title="Сделать админом">
+                            <i class="fas fa-user-plus"></i>
+                         </button>`}
+                    <button class="action-btn delete" onclick="deleteUser(${user.user_id})" title="Удалить">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `}).join('');
+}
+
+function stringToColor(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue = hash % 360;
+    return `hsl(${hue}, 70%, 50%)`;
+}
+
+function renderPagination(pagination) {
+    const container = document.getElementById('pagination');
+    let html = '';
+    
+    if (pagination.page > 1) {
+        html += `<button class="page-btn" onclick="changePage(${pagination.page - 1})">
+            <i class="fas fa-chevron-left"></i>
+        </button>`;
+    }
+    
+    for (let i = Math.max(1, pagination.page - 2); 
+         i <= Math.min(pagination.pages, pagination.page + 2); i++) {
+        html += `<button class="page-btn ${i === pagination.page ? 'active' : ''}" 
+                 onclick="changePage(${i})">${i}</button>`;
+    }
+    
+    if (pagination.page < pagination.pages) {
+        html += `<button class="page-btn" onclick="changePage(${pagination.page + 1})">
+            <i class="fas fa-chevron-right"></i>
+        </button>`;
+    }
+    
+    container.innerHTML = html;
+}
+
+function changePage(page) {
+    currentPage = page;
+    loadUsers();
+}
+
+function searchUsers() {
+    currentSearch = document.getElementById('searchInput').value;
+    currentRole = document.getElementById('roleFilter').value;
+    currentPage = 1;
+    loadUsers();
+}
+
+function viewUser(userId) {
+    window.location.href = `/admin/users/${userId}`;
+}
+
+function sendMessage(userId, username) {
+    document.getElementById('actionModalTitle').textContent = 'Отправить сообщение';
+    document.getElementById('actionModalBody').innerHTML = `
+        <p>Пользователю: @${username || userId}</p>
+        <textarea class="form-control" id="messageText" rows="4" 
+                  placeholder="Введите сообщение..."></textarea>
+    `;
+    selectedUserId = userId;
+    
+    document.getElementById('actionModalConfirm').onclick = sendMessageConfirm;
+    Modal.show('actionModal');
+}
+
+async function sendMessageConfirm() {
+    const text = document.getElementById('messageText').value;
+    if (!text.trim()) {
+        Notifications.warning('Введите текст сообщения');
+        return;
+    }
+    
+    try {
+        await API.post('/users/message', {
+            user_id: selectedUserId,
+            message: text
+        });
+        
+        Notifications.success('Сообщение отправлено');
+        Modal.hide('actionModal');
+    } catch (error) {
+        Notifications.error('Ошибка при отправке');
+    }
+}
+
+function makeAdmin(userId) {
+    Modal.showConfirm({
+        title: 'Назначить администратором',
+        message: 'Вы уверены, что хотите сделать этого пользователя администратором?',
+        onConfirm: async () => {
+            try {
+                await API.post(`/users/${userId}/make_admin`);
+                Notifications.success('Пользователь назначен администратором');
+                loadUsers();
+            } catch (error) {
+                Notifications.error('Ошибка при назначении');
+            }
+        }
+    });
+}
+
+function removeAdmin(userId) {
+    Modal.showConfirm({
+        title: 'Снять права администратора',
+        message: 'Вы уверены, что хотите снять права администратора?',
+        onConfirm: async () => {
+            try {
+                await API.post(`/users/${userId}/remove_admin`);
+                Notifications.success('Права администратора сняты');
+                loadUsers();
+            } catch (error) {
+                Notifications.error('Ошибка при снятии прав');
+            }
+        }
+    });
+}
+
+function deleteUser(userId) {
+    Modal.showConfirm({
+        title: 'Удаление пользователя',
+        message: 'Вы уверены, что хотите удалить пользователя? Все его данные будут потеряны.',
+        onConfirm: async () => {
+            try {
+                await API.delete(`/users/${userId}`);
+                Notifications.success('Пользователь удален');
+                loadUsers();
+            } catch (error) {
+                Notifications.error('Ошибка при удалении');
+            }
+        }
+    });
+}
+
+// Загрузка при старте
+document.addEventListener('DOMContentLoaded', () => {
+    loadStats();
+    loadUsers();
+});
+
+// Дебаунс для поиска
+const debouncedSearch = debounce(searchUsers, 500);
+document.getElementById('searchInput').addEventListener('input', debouncedSearch);
+document.getElementById('roleFilter').addEventListener('change', searchUsers);
+</script>
+{% endblock %}

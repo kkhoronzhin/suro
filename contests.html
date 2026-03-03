@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block title %}SURO Admin - Конкурсы{% endblock %}
+
+{% block content %}
+<div class="header">
+    <h1>Конкурсы и кэшбэки</h1>
+    <div class="header-actions">
+        <a href="/admin/contests/stats" class="btn btn-primary">
+            <i class="fas fa-chart-bar"></i>
+            Статистика
+        </a>
+    </div>
+</div>
+
+<div class="stats">
+    <div class="stat-card">
+        <div class="stat-title">Всего заявок</div>
+        <div class="stat-value" id="totalApps">—</div>
+        <div class="stat-change">за всё время</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Ожидают</div>
+        <div class="stat-value" id="pendingApps">—</div>
+        <div class="stat-change">требуют проверки</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Одобрено</div>
+        <div class="stat-value" id="approvedApps">—</div>
+        <div class="stat-change">выплачено</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Сумма выплат</div>
+        <div class="stat-value" id="totalPaid">—₽</div>
+        <div class="stat-change">за месяц</div>
+    </div>
+</div>
+
+<div class="contests-grid">
+    <!-- 100₽ -->
+    <div class="contest-card">
+        <div class="contest-header">
+            <span class="contest-amount">100₽</span>
+            <span class="badge badge-primary">Текстовый отзыв</span>
+        </div>
+        <div class="contest-body">
+            <p>✍️ Простой текстовый отзыв на Wildberries</p>
+            <div class="contest-stats">
+                <div class="stat">
+                    <span class="stat-label">Заявок:</span>
+                    <span class="stat-value" id="count_100">—</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Новых:</span>
+                    <span class="stat-value" id="new_100">—</span>
+                </div>
+            </div>
+        </div>
+        <div class="contest-footer">
+            <a href="/admin/contests/100" class="btn btn-primary btn-sm">
+                <i class="fas fa-eye"></i>
+                Просмотр
+            </a>
+            <a href="/admin/contests/100/export" class="btn btn-sm">
+                <i class="fas fa-download"></i>
+                Экспорт
+            </a>
+        </div>
+    </div>
+
+    <!-- 150₽ -->
+    <div class="contest-card">
+        <div class="contest-header">
+            <span class="contest-amount">150₽</span>
+            <span class="badge badge-success">С фото</span>
+        </div>
+        <div class="contest-body">
+            <p>📸 Отзыв с фотографиями товара</p>
+            <div class="contest-stats">
+                <div class="stat">
+                    <span class="stat-label">Заявок:</span>
+                    <span class="stat-value" id="count_150">—</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Новых:</span>
+                    <span class="stat-value" id="new_150">—</span>
+                </div>
+            </div>
+        </div>
+        <div class="contest-footer">
+            <a href="/admin/contests/150" class="btn btn-success btn-sm">
+                <i class="fas fa-eye"></i>
+                Просмотр
+            </a>
+            <a href="/admin/contests/150/export" class="btn btn-sm">
+                <i class="fas fa-download"></i>
+                Экспорт
+            </a>
+        </div>
+    </div>
+
+    <!-- 250₽ -->
+    <div class="contest-card">
+        <div class="contest-header">
+            <span class="contest-amount">250₽</span>
+            <span class="badge badge-warning">Расширенный</span>
+        </div>
+        <div class="contest-body">
+            <p>🎥 Видеообзор + сторис с отметкой</p>
+            <div class="contest-stats">
+                <div class="stat">
+                    <span class="stat-label">Заявок:</span>
+                    <span class="stat-value" id="count_250">—</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Новых:</span>
+                    <span class="stat-value" id="new_250">—</span>
+                </div>
+            </div>
+        </div>
+        <div class="contest-footer">
+            <a href="/admin/contests/250" class="btn btn-warning btn-sm">
+                <i class="fas fa-eye"></i>
+                Просмотр
+            </a>
+            <a href="/admin/contests/250/export" class="btn btn-sm">
+                <i class="fas fa-download"></i>
+                Экспорт
+            </a>
+        </div>
+    </div>
+
+    <!-- 5000₽ -->
+    <div class="contest-card">
+        <div class="contest-header">
+            <span class="contest-amount">5000₽</span>
+            <span class="badge badge-danger">Розыгрыш</span>
+        </div>
+        <div class="contest-body">
+            <p>🏆 Ежемесячный розыгрыш призов</p>
+            <div class="contest-stats">
+                <div class="stat">
+                    <span class="stat-label">Участников:</span>
+                    <span class="stat-value" id="count_5000">—</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">В этом месяце:</span>
+                    <span class="stat-value" id="new_5000">—</span>
+                </div>
+            </div>
+        </div>
+        <div class="contest-footer">
+            <a href="/admin/contests/5000" class="btn btn-danger btn-sm">
+                <i class="fas fa-eye"></i>
+                Управление
+            </a>
+            <a href="/admin/contests/5000/draw" class="btn btn-sm">
+                <i class="fas fa-random"></i>
+                Провести розыгрыш
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+.contests-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+.contest-card {
+    background: #1e293b;
+    border-radius: 12px;
+    border: 1px solid #334155;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.contest-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+}
+
+.contest-header {
+    padding: 1.5rem;
+    background: #0f172a;
+    border-bottom: 1px solid #334155;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.contest-amount {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #f1f5f9;
+}
+
+.contest-body {
+    padding: 1.5rem;
+}
+
+.contest-body p {
+    color: #94a3b8;
+    margin-bottom: 1rem;
+}
+
+.contest-stats {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.contest-stats .stat {
+    flex: 1;
+}
+
+.contest-stats .stat-label {
+    display: block;
+    color: #94a3b8;
+    font-size: 0.75rem;
+    margin-bottom: 0.25rem;
+}
+
+.contest-stats .stat-value {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #f1f5f9;
+}
+
+.contest-footer {
+    padding: 1rem 1.5rem;
+    background: #0f172a;
+    border-top: 1px solid #334155;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.contest-footer .btn {
+    flex: 1;
+}
+</style>
+
+<script>
+// Загрузка статистики
+fetch('/api/stats')
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('totalApps').textContent = data.data.total.applications;
+            document.getElementById('pendingApps').textContent = data.data.pending || 0;
+            document.getElementById('approvedApps').textContent = data.data.approved || 0;
+            document.getElementById('totalPaid').textContent = data.data.total.paid + '₽';
+            
+            // По типам
+            data.data.by_type.forEach(item => {
+                document.getElementById(`count_${item.type}`).textContent = item.total;
+                document.getElementById(`new_${item.type}`).textContent = item.new;
+            });
+        }
+    });
+</script>
+{% endblock %}

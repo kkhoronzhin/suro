@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+
+{% block title %}SURO Admin - Логи{% endblock %}
+
+{% block content %}
+<div class="header">
+    <h1>Системные логи</h1>
+    <div class="header-actions">
+        <button class="btn" onclick="refreshLogs()">
+            <i class="fas fa-sync-alt"></i>
+            Обновить
+        </button>
+        <button class="btn btn-danger" onclick="clearLogs()">
+            <i class="fas fa-trash"></i>
+            Очистить
+        </button>
+    </div>
+</div>
+
+<!-- Выбор лога -->
+<div class="tabs">
+    <div class="tab active" onclick="switchLog('bot')">Бот</div>
+    <div class="tab" onclick="switchLog('errors')">Ошибки</div>
+    <div class="tab" onclick="switchLog('api')">API</div>
+</div>
+
+<!-- Поиск -->
+<div class="search-bar">
+    <input type="text" class="search-input" id="logSearch" 
+           placeholder="Поиск по логам..." onkeyup="filterLogs()">
+    <select class="form-select" id="logLevel" onchange="filterLogs()" style="width: auto;">
+        <option value="all">Все уровни</option>
+        <option value="INFO">INFO</option>
+        <option value="WARNING">WARNING</option>
+        <option value="ERROR">ERROR</option>
+        <option value="DEBUG">DEBUG</option>
+    </select>
+</div>
+
+<!-- Контейнер для логов -->
+<div class="logs-container" id="logsContainer">
+    <div class="loading">
+        <i class="fas fa-spinner"></i>
+        Загрузка логов...
+    </div>
+</div>
+
+<!-- Настройки -->
+<div class="logs-footer">
+    <div class="logs-stats" id="logStats"></div>
+    <div class="logs-controls">
+        <label>
+            <input type="checkbox" id="autoRefresh" checked onchange="toggleAutoRefresh()">
+            Автообновление
+        </label>
+        <select class="form-select" id="linesCount" onchange="loadLogs()" style="width: 80px;">
+            <option value="50">50</option>
+            <option value="100" selected>100</option>
+            <option value="200">200</option>
+            <option value="500">500</option>
+        </select>
+    </div>
+</div>
+
+<style>
+.logs-container {
+    background: #0f172a;
+    border-radius: 8px;
+    padding: 1rem;
+    font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-size: 0.875rem;
+    max-height: 70vh;
+    overflow-y: auto;
+    border: 1px solid #334155;
+}
+
+.log-entry {
+    padding: 0.5rem;
+    border-bottom: 1px solid #1e293b;
+    white-space: pre-wrap;
+    word-break: break-word;
+    display: flex;
+    gap: 1rem;
+}
+
+.log-entry:hover {
+    background: #1e293b;
+}
+
+.log-time {
+    color: #94a3b8;
+    min-width: 180px;
+    flex-shrink: 0;
+}
+
+.log-level {
+    min-width: 70px;
+    flex-shrink: 0;
+    font-weight: 600;
+}
+
+.log-level.INFO {
+    color: #10b981;
+}
+
+.log-level.WARNING {
+    color: #f59e0b;
+}
+
+.log-level.ERROR {
+    color: #ef4444;
+}
+
+.log-level.DEBUG {
+    color: #94a3b8;
+}
+
+.log-message {
+    color: #f1f5f9;
+    flex: 1;
+}
+
+.log-message .highlight {
+    background: #3b82f6;
+    color: white;
+    padding: 0.125rem 0.25rem;
+    border-radius: 4px;
+}
+
+.logs-footer {
+    margin-top: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: #1e293b;
+    border-radius: 8px;
+}
+
+.logs-stats {
+    color: #94a3b8;
+    font-size: 0.875rem;
+}
+
+.logs-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.logs-controls label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #94a3b8;
+    font-size: 0.875rem;
+}
+
+.highlight-row {
+    background: #2563eb !important;
+}
+</style>
+
+<script>
+let currentLogType = 'bot';
+let autoRefreshInterval = null;
+let logsData = [];
+
+function switchLog(type) {
+    currentLogType = type;
+    
+    // Обновляем активный таб
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    event.target.classList.add('active');
+    
+    loadLogs();
+}
+
+async function loadLogs() {
+    const container = document.getElementById('logsContainer');
+    const lines = document.getElementById('linesCount').value;
+    
+    container.innerHTML = '<div class="loading"><i class="fas fa-spinner"></i> Загрузка логов...</div>';
+    
+    try {
+        const data = await API.get(`/logs/${currentLogType}`, { lines });
+        logsData = data.data.logs;
+        renderLogs(logsData);
+        
+        document.getElementById('logStats').innerHTML = 
+            `Показано ${logsData.length} строк · Всего ${data.data.total || logsData.length}`;
+    } catch (error) {
+        container.innerHTML = '<div class="alert alert-danger">Ошибка загрузки логов</div>';
+    }
+}
+
+function renderLogs(logs) {
+    const container = document.getElementById('logsContainer');
+    const searchTerm = document.getElementById('logSearch').value.toLowerCase();
+    const levelFilter = document.getElementById('logLevel').value;
+    
+    let filteredLogs = logs;
+    
+    // Фильтр по уровню
+    if (levelFilter !== 'all') {
+        filteredLogs = filteredLogs.filter(log => 
+            log.includes(` - ${levelFilter} - `) || log.includes(` - ${levelFilter} `)
+        );
+    }
+    
+    // Поиск по тексту
+    if (searchTerm) {
+        filteredLogs = filteredLogs.filter(log => 
+            log.toLowerCase().includes(searchTerm)
+        );
+    }
+    
+    if (filteredLogs.length === 0) {
+        container.innerHTML = '<div class="empty-state">Логи не найдены</div>';
+        return;
+    }
+    
+    container.innerHTML = filteredLogs.map(log => {
+        const match = log.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) - (\w+) - (.*)/);
+        
+        if (match) {
+            const [_, time, level, message] = match;
+            const highlightedMessage = searchTerm ? 
+                message.replace(new RegExp(searchTerm, 'gi'), match => 
+                    `<span class="highlight">${match}</span>`) : message;
+            
+            return `
+                <div class="log-entry">
+                    <span class="log-time">${time}</span>
+                    <span class="log-level ${level}">${level}</span>
+                    <span class="log-message">${highlightedMessage}</span>
+                </div>
+            `;
+        } else {
+            // Если лог не парсится, показываем как есть
+            return `<div class="log-entry"><span class="log-message">${log}</span></div>`;
+        }
+    }).join('');
+}
+
+function filterLogs() {
+    renderLogs(logsData);
+}
+
+function refreshLogs() {
+    loadLogs();
+}
+
+function clearLogs() {
+    Modal.showConfirm({
+        title: 'Очистка логов',
+        message: 'Вы уверены, что хотите очистить все логи?',
+        onConfirm: async () => {
+            try {
+                await API.post(`/logs/${currentLogType}/clear`);
+                Notifications.success('Логи очищены');
+                loadLogs();
+            } catch (error) {
+                Notifications.error('Ошибка при очистке');
+            }
+        }
+    });
+}
+
+function toggleAutoRefresh() {
+    const enabled = document.getElementById('autoRefresh').checked;
+    
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+    }
+    
+    if (enabled) {
+        autoRefreshInterval = setInterval(loadLogs, 30000);
+    }
+}
+
+// Копирование логов
+document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.key === 'c' && window.getSelection().toString()) {
+        // Позволяем стандартное копирование
+    }
+});
+
+// Загрузка при старте
+document.addEventListener('DOMContentLoaded', () => {
+    loadLogs();
+    toggleAutoRefresh();
+});
+
+// Очистка интервала при уходе со страницы
+window.addEventListener('beforeunload', () => {
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+    }
+}); 
+</script>
+{% endblock %}

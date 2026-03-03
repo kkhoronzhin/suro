@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}SURO Admin{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="app">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <img src="{{ url_for('static', filename='icon.png') }}" alt="SURO">
+                <span>SURO Admin</span>
+            </div>
+            
+            <ul class="nav">
+                <li class="nav-item">
+                    <a href="{{ url_for('index') }}" class="nav-link {% if request.path == '/' %}active{% endif %}">
+                        <i class="fas fa-home"></i>
+                        Главная
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('users_page') }}" class="nav-link {% if request.path.startswith('/admin/users') %}active{% endif %}">
+                        <i class="fas fa-users"></i>
+                        Пользователи
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('contests_page') }}" class="nav-link {% if request.path.startswith('/admin/contests') %}active{% endif %}">
+                        <i class="fas fa-trophy"></i>
+                        Конкурсы
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('applications_page') }}" class="nav-link {% if request.path == '/admin/applications' %}active{% endif %}">
+                        <i class="fas fa-file-alt"></i>
+                        Заявки
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('support_page') }}" class="nav-link {% if request.path == '/admin/support' %}active{% endif %}">
+                        <i class="fas fa-headset"></i>
+                        Поддержка
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ url_for('logs_page') }}" class="nav-link {% if request.path == '/admin/logs' %}active{% endif %}">
+                        <i class="fas fa-history"></i>
+                        Логи
+                    </a>
+                </li>
+            </ul>
+            
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <i class="fas fa-user-circle"></i>
+                    <span>{{ current_user.username if current_user.is_authenticated else 'Гость' }}</span>
+                </div>
+                <a href="{{ url_for('auth.logout') }}" class="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i>
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main content -->
+        <main class="main">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

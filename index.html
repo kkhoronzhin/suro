@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}SURO Admin - Главная{% endblock %}
+
+{% block content %}
+<div class="header">
+    <h1>Панель управления</h1>
+    <div class="header-actions">
+        <span class="version">v2.0.0</span>
+    </div>
+</div>
+
+<!-- Stats cards -->
+<div class="stats">
+    <div class="stat-card">
+        <div class="stat-title">Пользователи</div>
+        <div class="stat-value" id="totalUsers">—</div>
+        <div class="stat-change" id="todayUsers">—</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Заявки</div>
+        <div class="stat-value" id="totalApps">—</div>
+        <div class="stat-change" id="todayApps">—</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Выплачено</div>
+        <div class="stat-value" id="totalPaid">—₽</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-title">Поддержка</div>
+        <div class="stat-value" id="supportOpen">—</div>
+        <div class="stat-change" id="supportActive">открыто</div>
+    </div>
+</div>
+
+<!-- Charts -->
+<div class="charts">
+    <div class="chart-container">
+        <h3>Новые пользователи</h3>
+        <canvas id="usersChart"></canvas>
+    </div>
+    <div class="chart-container">
+        <h3>Заявки по типам</h3>
+        <canvas id="appsChart"></canvas>
+    </div>
+</div>
+
+<!-- Recent activity -->
+<div class="recent-activity">
+    <h2>Последние действия</h2>
+    <div class="table-container">
+        <table id="recentTable">
+            <thead>
+                <tr>
+                    <th>Время</th>
+                    <th>Пользователь</th>
+                    <th>Действие</th>
+                    <th>Детали</th>
+                </tr>
+            </thead>
+            <tbody id="recentList">
+                <tr><td colspan="4" class="loading">Загрузка...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Загрузка статистики
+    fetch('/api/stats')
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('totalUsers').textContent = data.data.total.users;
+                document.getElementById('totalApps').textContent = data.data.total.applications;
+                document.getElementById('totalPaid').textContent = data.data.total.paid + '₽';
+                document.getElementById('todayUsers').textContent = 'сегодня: +' + data.data.today.users;
+                document.getElementById('todayApps').textContent = 'сегодня: +' + data.data.today.applications;
+                document.getElementById('supportOpen').textContent = data.data.support.active;
+                
+                // Инициализация графиков
+                initCharts(data.data.by_type);
+            }
+        });
+    
+    // Загрузка последних действий
+    fetch('/api/logs/recent')
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                const tbody = document.getElementById('recentList');
+                tbody.innerHTML = data.data.map(log => `
+                    <tr>
+                        <td>${new Date(log.created_at).toLocaleString()}</td>
+                        <td>@${log.username || 'unknown'}</td>
+                        <td>${log.action}</td>
+                        <td>${log.details || '—'}</td>
+                    </tr>
+                `).join('');
+            }
+        });
+    
+    function initCharts(byType) {
+        // График пользователей
+        const ctx1 = document.getElementById('usersChart').getContext('2d');
+        new Chart(ctx1, {
+            type: 'line',
+            data: {
+                labels: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
+                datasets: [{
+                    label: 'Новые пользователи',
+                    data: [12, 19, 3, 5, 2, 3, 9],
+                    borderColor: '#3b82f6',
+                    tension: 0.1
+                }]
+            }
+        });
+        
+        // График заявок по типам
+        const ctx2 = document.getElementById('appsChart').getContext('2d');
+        new Chart(ctx2, {
+            type: 'doughnut',
+            data: {
+                labels: byType.map(t => t.type + '₽'),
+                datasets: [{
+                    data: byType.map(t => t.count),
+                    backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444']
+                }]
+            }
+        });
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+
+{% block title %}SURO Admin - Пользователь {{ user_id }}{% endblock %}
+
+{% block content %}
+<div class="header">
+    <h1>Информация о пользователе</h1>
+    <div class="header-actions">
+        <a href="/admin/users" class="btn">
+            <i class="fas fa-arrow-left"></i>
+            Назад
+        </a>
+    </div>
+</div>
+
+<!-- Основная информация -->
+<div class="user-profile">
+    <div class="profile-header">
+        <div class="profile-avatar">
+            <div class="avatar-placeholder" id="avatarPlaceholder">?</div>
+        </div>
+        <div class="profile-info">
+            <h2 id="userName">Загрузка...</h2>
+            <p class="user-username" id="userUsername">@loading</p>
+            <div class="user-meta">
+                <span class="badge" id="userRole">Пользователь</span>
+                <span class="user-id">ID: <span id="userId">{{ user_id }}</span></span>
+            </div>
+        </div>
+        <div class="profile-actions">
+            <button class="btn btn-primary" onclick="sendMessage()">
+                <i class="fas fa-envelope"></i>
+                Написать
+            </button>
+            <button class="btn btn-danger" onclick="blockUser()">
+                <i class="fas fa-ban"></i>
+                Заблокировать
+            </button>
+        </div>
+    </div>
+
+    <!-- Статистика -->
+    <div class="stats">
+        <div class="stat-card">
+            <div class="stat-title">Заявок всего</div>
+            <div class="stat-value" id="totalApps">—</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-title">Одобрено</div>
+            <div class="stat-value" id="approvedApps">—</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-title">Выплачено</div>
+            <div class="stat-value" id="totalPaid">—₽</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-title">Активность</div>
+            <div class="stat-value" id="lastActive">—</div>
+        </div>
+    </div>
+
+    <!-- Вкладки -->
+    <div class="tabs">
+        <div class="tab active" onclick="showTab('applications')">Заявки</div>
+        <div class="tab" onclick="showTab('support')">Обращения</div>
+        <div class="tab" onclick="showTab('activity')">Активность</div>
+    </div>
+
+    <!-- Контент вкладок -->
+    <div id="applicationsTab" class="tab-content active">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Тип</th>
+                        <th>Дата</th>
+                        <th>Артикул</th>
+                        <th>Статус</th>
+                        <th>Выплата</th>
+                    </tr>
+                </thead>
+                <tbody id="appsList">
+                    <tr><td colspan="6" class="loading">Загрузка...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="supportTab" class="tab-content">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Дата</th>
+                        <th>Тема</th>
+                        <th>Статус</th>
+                        <th>Ответил</th>
+                    </tr>
+                </thead>
+                <tbody id="supportList">
+                    <tr><td colspan="5" class="loading">Загрузка...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="activityTab" class="tab-content">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Время</th>
+                        <th>Действие</th>
+                        <th>Детали</th>
+                    </tr>
+                </thead>
+                <tbody id="activityList">
+                    <tr><td colspan="3" class="loading">Загрузка...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+.user-profile {
+    background: #1e293b;
+    border-radius: 12px;
+    border: 1px solid #334155;
+    padding: 2rem;
+}
+
+.profile-header {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 2rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid #334155;
+}
+
+.profile-avatar {
+    width: 100px;
+    height: 100px;
+}
+
+.avatar-placeholder {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #3b82f6, #10b981);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    font-weight: 600;
+    color: white;
+}
+
+.profile-info {
+    flex: 1;
+}
+
+.profile-info h2 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.user-username {
+    color: #94a3b8;
+    margin-bottom: 1rem;
+}
+
+.user-meta {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.user-id {
+    color: #94a3b8;
+    font-size: 0.875rem;
+}
+
+.profile-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+}
+
+.tab-content {
+    display: none;
+    margin-top: 1.5rem;
+}
+
+.tab-content.active {
+    display: block;
+}
+</style>
+
+<script>
+const userId = {{ user_id }};
+
+// Загрузка данных пользователя
+async function loadUserData() {
+    try {
+        const data = await API.get(`/users/${userId}`);
+        
+        // Основная информация
+        const user = data.data.user;
+        document.getElementById('userName').textContent = 
+            `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Без имени';
+        document.getElementById('userUsername').textContent = user.username ? `@${user.username}` : '—';
+        document.getElementById('avatarPlaceholder').textContent = 
+            (user.first_name || '?')[0].toUpperCase();
+        
+        const roleBadge = document.getElementById('userRole');
+        if (user.is_admin) {
+            roleBadge.textContent = 'Администратор';
+            roleBadge.className = 'badge badge-primary';
+        } else {
+            roleBadge.textContent = 'Пользователь';
+            roleBadge.className = 'badge badge-muted';
+        }
+        
+        // Статистика
+        document.getElementById('totalApps').textContent = user.stats?.total_apps || 0;
+        document.getElementById('approvedApps').textContent = user.stats?.approved_apps || 0;
+        document.getElementById('totalPaid').textContent = (user.stats?.total_paid || 0) + '₽';
+        document.getElementById('lastActive').textContent = 
+            DateFormatter.relative(user.last_activity) || '—';
+        
+        // Заявки
+        renderApps(data.data.applications);
+        
+        // Обращения
+        renderSupport(data.data.support_requests);
+        
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+function renderApps(apps) {
+    const tbody = document.getElementById('appsList');
+    
+    if (!apps || apps.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">Нет заявок</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = apps.map(app => `
+        <tr>
+            <td>${app.id}</td>
+            <td>${app.type}₽</td>
+            <td>${DateFormatter.format(app.created_at, 'short')}</td>
+            <td>
+                <a href="https://www.wildberries.ru/catalog/${app.article}/detail.aspx" 
+                   target="_blank">${app.article}</a>
+            </td>
+            <td>
+                <span class="badge ${getStatusBadge(app.status)}">
+                    ${getStatusText(app.status)}
+                </span>
+            </td>
+            <td>${app.paid_amount || 0}₽</td>
+        </tr>
+    `).join('');
+}
+
+function renderSupport(requests) {
+    const tbody = document.getElementById('supportList');
+    
+    if (!requests || requests.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Нет обращений</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = requests.map(req => `
+        <tr>
+            <td>${req.id}</td>
+            <td>${DateFormatter.format(req.created_at, 'short')}</td>
+            <td>${req.message?.substring(0, 50)}...</td>
+            <td>
+                <span class="badge ${req.status === 'open' ? 'badge-warning' : 'badge-muted'}">
+                    ${req.status === 'open' ? 'Открыто' : 'Закрыто'}
+                </span>
+            </td>
+            <td>${req.admin_id ? '✅' : '—'}</td>
+        </tr>
+    `).join('');
+}
+
+function getStatusBadge(status) {
+    const badges = {0: 'badge-warning', 1: 'badge-success', 2: 'badge-danger'};
+    return badges[status] || 'badge-muted';
+}
+
+function getStatusText(status) {
+    const texts = {0: 'Ожидает', 1: 'Одобрено', 2: 'Отклонено'};
+    return texts[status] || 'Неизвестно';
+}
+
+function showTab(tab) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    
+    event.target.classList.add('active');
+    document.getElementById(tab + 'Tab').classList.add('active');
+}
+
+function sendMessage() {
+    window.location.href = `/admin/pm?to=${userId}`;
+}
+
+function blockUser() {
+    Modal.showConfirm({
+        title: 'Блокировка пользователя',
+        message: 'Вы уверены, что хотите заблокировать этого пользователя?',
+        onConfirm: async () => {
+            try {
+                await API.post(`/users/${userId}/block`);
+                Notifications.success('Пользователь заблокирован');
+            } catch (error) {
+                Notifications.error('Ошибка при блокировке');
+            }
+        }
+    });
+}
+
+// Загрузка данных
+document.addEventListener('DOMContentLoaded', loadUserData);
+</script>
+{% endblock %}

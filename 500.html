@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}SURO Admin - 500{% endblock %}
+
+{% block content %}
+<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; text-align: center;">
+    <i class="fas fa-exclamation-triangle" style="font-size: 5rem; color: #ef4444; margin-bottom: 2rem;"></i>
+    <h1 style="font-size: 3rem; margin-bottom: 1rem;">500</h1>
+    <h2 style="color: #94a3b8; margin-bottom: 2rem;">Внутренняя ошибка сервера</h2>
+    <p style="color: #64748b; max-width: 400px; margin-bottom: 2rem;">
+        Что-то пошло не так. Администраторы уже уведомлены об ошибке.
+    </p>
+    <div style="display: flex; gap: 1rem;">
+        <button class="btn" onclick="location.reload()">
+            <i class="fas fa-sync-alt"></i>
+            Обновить
+        </button>
+        <a href="/" class="btn btn-primary">
+            <i class="fas fa-home"></i>
+            На главную
+        </a>
+    </div>
+</div>
+{% endblock %}

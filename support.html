@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+
+{% block title %}SURO Admin - Поддержка{% endblock %}
+
+{% block content %}
+<div class="header">
+    <h1>Чат поддержки</h1>
+    <div class="header-actions">
+        <span class="badge badge-primary" id="openCount">0 открыто</span>
+    </div>
+</div>
+
+<!-- Фильтры -->
+<div class="tabs">
+    <div class="tab active" onclick="filterSupport('all')">Все</div>
+    <div class="tab" onclick="filterSupport('open')">Открытые</div>
+    <div class="tab" onclick="filterSupport('closed')">Закрытые</div>
+</div>
+
+<!-- Список обращений -->
+<div class="support-grid" id="supportList">
+    <!-- Загружается через API -->
+</div>
+
+<!-- Модалка ответа -->
+<div class="modal" id="replyModal">
+    <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+            <h3 class="modal-title">Ответ на обращение #<span id="replyTicketId"></span></h3>
+            <button class="modal-close" onclick="Modal.hide('replyModal')">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="original-message" id="originalMessage"></div>
+            <textarea class="form-control" id="replyText" rows="5" 
+                      placeholder="Введите ответ..."></textarea>
+        </div>
+        <div class="modal-actions">
+            <button class="btn" onclick="Modal.hide('replyModal')">Отмена</button>
+            <button class="btn btn-primary" onclick="sendReply()">Отправить</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.support-grid {
+    display: grid;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.support-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 1.5rem;
+    transition: transform 0.2s;
+}
+
+.support-card:hover {
+    transform: translateX(4px);
+    border-color: #3b82f6;
+}
+
+.support-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.support-user {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.support-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #3b82f6, #10b981);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+}
+
+.support-info h4 {
+    margin-bottom: 0.25rem;
+}
+
+.support-info a {
+    color: #94a3b8;
+    font-size: 0.875rem;
+    text-decoration: none;
+}
+
+.support-info a:hover {
+    color: #3b82f6;
+}
+
+.support-meta {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.support-time {
+    color: #94a3b8;
+    font-size: 0.875rem;
+}
+
+.support-message {
+    padding: 1rem;
+    background: #0f172a;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    color: #f1f5f9;
+}
+
+.support-message p {
+    margin: 0;
+}
+
+.support-footer {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: #94a3b8;
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+</style>
+
+<script>
+let currentFilter = 'all';
+
+async function loadSupport() {
+    try {
+        const data = await API.get('/support/requests', {
+            status: currentFilter !== 'all' ? currentFilter : null
+        });
+        
+        renderSupport(data.data.requests);
+        document.getElementById('openCount').textContent = 
+            data.data.requests.filter(r => r.status === 'open').length + ' открыто';
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+function renderSupport(requests) {
+    const container = document.getElementById('supportList');
+    
+    if (!requests || requests.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-inbox"></i>
+                <p>Нет обращений</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = requests.map(req => `
+        <div class="support-card">
+            <div class="support-header">
+                <div class="support-user">
+                    <div class="support-avatar">
+                        ${(req.first_name || '?')[0].toUpperCase()}
+                    </div>
+                    <div class="support-info">
+                        <h4>${req.first_name || 'Пользователь'} ${req.last_name || ''}</h4>
+                        <a href="https://t.me/${req.username}" target="_blank">
+                            @${req.username || 'unknown'}
+                        </a>
+                    </div>
+                </div>
+                <div class="support-meta">
+                    <span class="badge ${req.status === 'open' ? 'badge-warning' : 'badge-muted'}">
+                        ${req.status === 'open' ? 'Открыто' : 'Закрыто'}
+                    </span>
+                    <span class="support-time" title="${DateFormatter.format(req.created_at, 'long')}">
+                        ${DateFormatter.relative(req.created_at)}
+                    </span>
+                </div>
+            </div>
+            
+            <div class="support-message">
+                <p>${req.message || 'Без текста'}</p>
+            </div>
+            
+            <div class="support-footer">
+                <button class="btn btn-sm" onclick="viewHistory(${req.id})">
+                    <i class="fas fa-history"></i>
+                    История
+                </button>
+                ${req.status === 'open' ? `
+                    <button class="btn btn-primary btn-sm" onclick="openReply(${req.id}, ${req.user_id}, '${req.ticket_id}')">
+                        <i class="fas fa-reply"></i>
+                        Ответить
+                    </button>
+                    <button class="btn btn-danger btn-sm" onclick="closeRequest(${req.id})">
+                        <i class="fas fa-check"></i>
+                        Закрыть
+                    </button>
+                ` : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+function filterSupport(filter) {
+    currentFilter = filter;
+    
+    // Обновляем активный таб
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    event.target.classList.add('active');
+    
+    loadSupport();
+}
+
+function openReply(requestId, userId, ticketId) {
+    document.getElementById('replyTicketId').textContent = ticketId;
+    document.getElementById('replyText').value = '';
+    document.getElementById('replyModal').dataset.requestId = requestId;
+    document.getElementById('replyModal').dataset.userId = userId;
+    
+    // Загружаем оригинальное сообщение
+    API.get(`/support/requests/${requestId}`).then(data => {
+        document.getElementById('originalMessage').innerHTML = `
+            <strong>Оригинальное сообщение:</strong>
+            <p style="margin-top: 0.5rem; padding: 0.5rem; background: #0f172a; border-radius: 4px;">
+                ${data.data.message}
+            </p>
+        `;
+    });
+    
+    Modal.show('replyModal');
+}
+
+async function sendReply() {
+    const requestId = document.getElementById('replyModal').dataset.requestId;
+    const userId = document.getElementById('replyModal').dataset.userId;
+    const text = document.getElementById('replyText').value;
+    
+    if (!text.trim()) {
+        Notifications.warning('Введите текст ответа');
+        return;
+    }
+    
+    try {
+        await API.post('/support/reply', {
+            request_id: requestId,
+            user_id: userId,
+            message: text
+        });
+        
+        Notifications.success('Ответ отправлен');
+        Modal.hide('replyModal');
+        loadSupport();
+    } catch (error) {
+        Notifications.error('Ошибка при отправке');
+    }
+}
+
+async function closeRequest(id) {
+    Modal.showConfirm({
+        title: 'Закрытие обращения',
+        message: 'Закрыть это обращение?',
+        onConfirm: async () => {
+            try {
+                await API.post(`/support/requests/${id}/close`);
+                Notifications.success('Обращение закрыто');
+                loadSupport();
+            } catch (error) {
+                Notifications.error('Ошибка при закрытии');
+            }
+        }
+    });
+}
+
+function viewHistory(id) {
+    // Загружаем историю переписки
+    API.get(`/support/requests/${id}/history`).then(data => {
+        // TODO: показать историю
+        console.log(data);
+    });
+}
+
+// Загрузка при старте
+document.addEventListener('DOMContentLoaded', loadSupport);
+
+// Обновление каждые 30 секунд
+setInterval(loadSupport, 30000);
+</script>
+{% endblock %}
